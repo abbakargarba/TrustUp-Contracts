@@ -1,6 +1,7 @@
+
 # TrustUp Contracts
 
-TrustUp is a decentralized "Buy Now, Pay Later" (BNPL) platform built on the Stellar network using Soroban smart contracts. Users pay a 20% guarantee deposit and receive credit from a shared liquidity pool, with their on-chain reputation adjusting based on repayment behavior.
+Decentralized "Buy Now, Pay Later" (BNPL) platform on Stellar using Soroban smart contracts. Users pay 20% guarantee deposit and receive credit from a shared liquidity pool, with on-chain reputation adjusting based on repayment behavior.
 
 ## Project Structure
 
@@ -68,22 +69,32 @@ Install the required target:
 rustup target add wasm32-unknown-unknown
 ```
 
-## Building
+## Build
+
+Check contracts (verify without building):
+```bash
+cargo check
+```
 
 Build all contracts:
 ```bash
-cargo build --target wasm32-unknown-unknown --release
+cargo build --release
 ```
 
 Build a specific contract:
 ```bash
-cargo build --target wasm32-unknown-unknown --release -p escrow-contract
-cargo build --target wasm32-unknown-unknown --release -p creditline-contract
-cargo build --target wasm32-unknown-unknown --release -p reputation-contract
-cargo build --target wasm32-unknown-unknown --release -p pool-contract
+cargo build --release -p escrow-contract
+cargo build --release -p creditline-contract
+cargo build --release -p reputation-contract
+cargo build --release -p pool-contract
 ```
 
-## Testing
+Build for development:
+```bash
+cargo build
+```
+
+## Test
 
 Run all tests:
 ```bash
@@ -98,43 +109,8 @@ cargo test -p reputation-contract
 cargo test -p pool-contract
 ```
 
-## Adding New Contracts
-
-To add a new contract to the workspace:
-
-1. Create a new folder in `contracts/` with your contract name
-2. Add a `Cargo.toml` with Soroban SDK dependency (version 22.0.0+)
-3. Add a `src/lib.rs` with contract skeleton
-4. Add the contract member to the root `Cargo.toml` workspace members list
-
-Example `Cargo.toml` for a new contract:
-```toml
-[package]
-name = "my-new-contract"
-version = "1.0.0"
-edition = "2021"
-
-[lib]
-crate-type = ["cdylib", "rlib"]
-
-[features]
-testutils = ["soroban-sdk/testutils"]
-default = []
-
-[dependencies]
-soroban-sdk = "22.0.0"
-
-[dev-dependencies]
-soroban-sdk = { version = "22.0.0", features = ["testutils"] }
-```
-
 ## Development Status
 
 This is the initial project structure and boilerplate. Contract logic implementation is pending.
 
 **Current version:** trustup-v1.0
-
-## License
-
-[Add your license here]
-# TrustUp-Contracts
