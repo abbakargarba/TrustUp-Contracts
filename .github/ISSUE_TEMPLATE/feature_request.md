@@ -6,7 +6,7 @@ labels: 'enhancement'
 assignees: ''
 ---
 
-> 📚 **Documentation**: See [docs/](../../docs/) for project context and standards
+> 📚 **Documentation**: See [docs/](https://github.com/TrustUp-app/TrustUp-Contracts/tree/main/docs) for project context and standards
 
 ## 🔖 Feature Title
 <!-- Brief and clear. What functionality are you proposing? -->
