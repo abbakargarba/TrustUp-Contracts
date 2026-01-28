@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use soroban_sdk::{symbol_short, testutils::Address as _, Address, Env};
+use soroban_sdk::{symbol_short, testutils::{Address as _, Events}, Address, Env, IntoVal, Symbol, Vec, Val};
 
 use crate::ReputationContract;
 use crate::ReputationContractClient;
@@ -247,3 +247,336 @@ fn it_gets_version() {
     assert_eq!(version, symbol_short!("v1_0_0"));
 }
 
+/// Test: Emits SCORECHGD event on score increase
+/// Verifies that increasing a user's score emits the correct event with (user, old_score, new_score, "increase") data.
+#[test]
+fn it_emits_score_changed_event_on_increase() {
+    let env = Env::default();
+    env.mock_all_auths();
+    
+    let contract_id = env.register(ReputationContract, ());
+    let client = ReputationContractClient::new(&env, &contract_id);
+    
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+    
+    let updater = Address::generate(&env);
+    client.set_updater(&admin, &updater, &true);
+    
+    let user = Address::generate(&env);
+    client.set_score(&updater, &user, &50);
+    
+    // Increase score
+    client.increase_score(&updater, &user, &20);
+    
+    // Verify event was emitted
+    let events: Vec<(Address, Vec<Val>, Val)> = env.events().all();
+    
+    // Find the SCORECHGD event (should be the last one)
+    let mut found_event = false;
+    for event in events.iter() {
+        let topics = event.1.clone();
+        let event_type: Symbol = topics.get(0).unwrap().into_val(&env);
+        
+        if event_type == symbol_short!("SCORECHGD") {
+            found_event = true;
+            
+            // Verify user address (second topic)
+            let event_user: Address = topics.get(1).unwrap().into_val(&env);
+            assert_eq!(event_user, user);
+            
+            // Verify data (old_score, new_score, reason) - data is a tuple
+            let data_tuple: (u32, u32, Symbol) = event.2.into_val(&env);
+            let (old_score, new_score, reason) = data_tuple;
+            
+            assert_eq!(old_score, 50);
+            assert_eq!(new_score, 70);
+            assert_eq!(reason, symbol_short!("increase"));
+            break;
+        }
+    }
+    
+    assert!(found_event, "SCORECHGD event not found");
+}
+
+/// Test: Emits SCORECHGD event on score decrease
+/// Verifies that decreasing a user's score emits the correct event with (user, old_score, new_score, "decrease") data.
+#[test]
+fn it_emits_score_changed_event_on_decrease() {
+    let env = Env::default();
+    env.mock_all_auths();
+    
+    let contract_id = env.register(ReputationContract, ());
+    let client = ReputationContractClient::new(&env, &contract_id);
+    
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+    
+    let updater = Address::generate(&env);
+    client.set_updater(&admin, &updater, &true);
+    
+    let user = Address::generate(&env);
+    client.set_score(&updater, &user, &50);
+    
+    // Decrease score
+    client.decrease_score(&updater, &user, &20);
+    
+    // Verify event was emitted
+    let events: Vec<(Address, Vec<Val>, Val)> = env.events().all();
+    
+    // Find the SCORECHGD event
+    let mut found_event = false;
+    for event in events.iter() {
+        let topics = event.1.clone();
+        let event_type: Symbol = topics.get(0).unwrap().into_val(&env);
+        
+        if event_type == symbol_short!("SCORECHGD") {
+            // Check if this is the decrease event (new_score should be 30)
+            let data_tuple: (u32, u32, Symbol) = event.2.into_val(&env);
+            let (_, _new_score, reason) = data_tuple;
+            
+            if reason == symbol_short!("decrease") {
+                found_event = true;
+                
+                // Verify user address (second topic)
+                let event_user: Address = topics.get(1).unwrap().into_val(&env);
+                assert_eq!(event_user, user);
+                
+                let (old_score, new_score, _) = data_tuple;
+                assert_eq!(old_score, 50);
+                assert_eq!(new_score, 30);
+                break;
+            }
+        }
+    }
+    
+    assert!(found_event, "SCORECHGD event with 'decrease' reason not found");
+}
+
+/// Test: Emits SCORECHGD event on score set
+/// Verifies that setting a user's score emits the correct event with (user, old_score, new_score, "set") data.
+#[test]
+fn it_emits_score_changed_event_on_set() {
+    let env = Env::default();
+    env.mock_all_auths();
+    
+    let contract_id = env.register(ReputationContract, ());
+    let client = ReputationContractClient::new(&env, &contract_id);
+    
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+    
+    let updater = Address::generate(&env);
+    client.set_updater(&admin, &updater, &true);
+    
+    let user = Address::generate(&env);
+    client.set_score(&updater, &user, &50);
+    
+    // Set score to new value
+    client.set_score(&updater, &user, &75);
+    
+    // Verify event was emitted
+    let events: Vec<(Address, Vec<Val>, Val)> = env.events().all();
+    
+    // Find the SCORECHGD event with "set" reason
+    let mut found_event = false;
+    for event in events.iter() {
+        let topics = event.1.clone();
+        let event_type: Symbol = topics.get(0).unwrap().into_val(&env);
+        
+        if event_type == symbol_short!("SCORECHGD") {
+            let data_tuple: (u32, u32, Symbol) = event.2.into_val(&env);
+            let (_, _, reason) = data_tuple;
+            
+            if reason == symbol_short!("set") {
+                found_event = true;
+                
+                // Verify user address (second topic)
+                let event_user: Address = topics.get(1).unwrap().into_val(&env);
+                assert_eq!(event_user, user);
+                
+                let (old_score, new_score, _) = data_tuple;
+                assert_eq!(old_score, 50);
+                assert_eq!(new_score, 75);
+                break;
+            }
+        }
+    }
+    
+    assert!(found_event, "SCORECHGD event with 'set' reason not found");
+}
+
+/// Test: Emits UPDCHGD event on updater grant
+/// Verifies that granting updater permission emits the correct event with (updater, true) data.
+#[test]
+fn it_emits_updater_changed_event_on_grant() {
+    let env = Env::default();
+    env.mock_all_auths();
+    
+    let contract_id = env.register(ReputationContract, ());
+    let client = ReputationContractClient::new(&env, &contract_id);
+    
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+    
+    let updater = Address::generate(&env);
+    
+    // Grant updater permission
+    client.set_updater(&admin, &updater, &true);
+    
+    // Verify event was emitted
+    let events: Vec<(Address, Vec<Val>, Val)> = env.events().all();
+    
+    // Find the UPDCHGD event with allowed=true
+    let mut found_event = false;
+    for event in events.iter() {
+        let topics = event.1.clone();
+        let event_type: Symbol = topics.get(0).unwrap().into_val(&env);
+        
+        if event_type == symbol_short!("UPDCHGD") {
+            let allowed: bool = event.2.into_val(&env);
+            
+            if allowed {
+                found_event = true;
+                
+                // Verify updater address (second topic)
+                let event_updater: Address = topics.get(1).unwrap().into_val(&env);
+                assert_eq!(event_updater, updater);
+                break;
+            }
+        }
+    }
+    
+    assert!(found_event, "UPDCHGD event with allowed=true not found");
+}
+
+/// Test: Emits UPDCHGD event on updater revoke
+/// Verifies that revoking updater permission emits the correct event with (updater, false) data.
+#[test]
+fn it_emits_updater_changed_event_on_revoke() {
+    let env = Env::default();
+    env.mock_all_auths();
+    
+    let contract_id = env.register(ReputationContract, ());
+    let client = ReputationContractClient::new(&env, &contract_id);
+    
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+    
+    let updater = Address::generate(&env);
+    client.set_updater(&admin, &updater, &true);
+    
+    // Revoke updater permission
+    client.set_updater(&admin, &updater, &false);
+    
+    // Verify event was emitted
+    let events: Vec<(Address, Vec<Val>, Val)> = env.events().all();
+    
+    // Find the UPDCHGD event with allowed=false
+    let mut found_event = false;
+    for event in events.iter() {
+        let topics = event.1.clone();
+        let event_type: Symbol = topics.get(0).unwrap().into_val(&env);
+        
+        if event_type == symbol_short!("UPDCHGD") {
+            let allowed: bool = event.2.into_val(&env);
+            
+            if !allowed {
+                found_event = true;
+                
+                // Verify updater address (second topic)
+                let event_updater: Address = topics.get(1).unwrap().into_val(&env);
+                assert_eq!(event_updater, updater);
+                break;
+            }
+        }
+    }
+    
+    assert!(found_event, "UPDCHGD event with allowed=false not found");
+}
+
+/// Test: Emits ADMINCHGD event on admin change
+/// Verifies that changing the admin emits the correct event with (old_admin, new_admin) data.
+#[test]
+fn it_emits_admin_changed_event() {
+    let env = Env::default();
+    env.mock_all_auths();
+    
+    let contract_id = env.register(ReputationContract, ());
+    let client = ReputationContractClient::new(&env, &contract_id);
+    
+    let admin = Address::generate(&env);
+    client.set_admin(&admin);
+    
+    let new_admin = Address::generate(&env);
+    
+    // Change admin
+    client.set_admin(&new_admin);
+    
+    // Verify event was emitted
+    let events: Vec<(Address, Vec<Val>, Val)> = env.events().all();
+    
+    // Find the ADMINCHGD event where old_admin != new_admin
+    let mut found_event = false;
+    for event in events.iter() {
+        let topics = event.1.clone();
+        let event_type: Symbol = topics.get(0).unwrap().into_val(&env);
+        
+        if event_type == symbol_short!("ADMINCHGD") {
+            let data_tuple: (Address, Address) = event.2.into_val(&env);
+            let (old_admin, new_admin_event) = data_tuple;
+            
+            // This should be the admin change event (not initial setup)
+            if old_admin != new_admin_event {
+                found_event = true;
+                assert_eq!(old_admin, admin);
+                assert_eq!(new_admin_event, new_admin);
+                break;
+            }
+        }
+    }
+    
+    assert!(found_event, "ADMINCHGD event for admin change not found");
+}
+
+/// Test: Emits ADMINCHGD event on initial admin setup
+/// Verifies that setting the admin for the first time emits the event with (dummy_address, new_admin) data.
+/// Note: The contract uses the new_admin as both old and new during initial setup.
+#[test]
+fn it_emits_admin_changed_event_on_initial_setup() {
+    let env = Env::default();
+    env.mock_all_auths();
+    
+    let contract_id = env.register(ReputationContract, ());
+    let client = ReputationContractClient::new(&env, &contract_id);
+    
+    let admin = Address::generate(&env);
+    
+    // Set admin for the first time
+    client.set_admin(&admin);
+    
+    // Verify event was emitted
+    let events: Vec<(Address, Vec<Val>, Val)> = env.events().all();
+    
+    // Find the ADMINCHGD event
+    let mut found_event = false;
+    for event in events.iter() {
+        let topics = event.1.clone();
+        let event_type: Symbol = topics.get(0).unwrap().into_val(&env);
+        
+        if event_type == symbol_short!("ADMINCHGD") {
+            found_event = true;
+            
+            // Verify data (old_admin, new_admin) - data is a tuple
+            let data_tuple: (Address, Address) = event.2.into_val(&env);
+            let (old_admin, new_admin_event) = data_tuple;
+            
+            // During initial setup, both old and new admin are set to the same address (the new admin)
+            assert_eq!(old_admin, admin);
+            assert_eq!(new_admin_event, admin);
+            break;
+        }
+    }
+    
+    assert!(found_event, "ADMINCHGD event not found");
+}
